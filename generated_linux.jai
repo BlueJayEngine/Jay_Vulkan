@@ -12251,10 +12251,10 @@ VkVideoSessionParametersKHR_T :: struct {}
 VkVideoSessionParametersKHR :: *VkVideoSessionParametersKHR_T;
 
 VkQueryResultStatusKHR :: enum u32 {
-    ERROR_KHR                               :: 4294967295;
+    ERROR_KHR                               :: 0xffff_ffff;
     NOT_READY_KHR                           :: 0;
     COMPLETE_KHR                            :: 1;
-    INSUFFICIENT_BITSTREAM_BUFFER_RANGE_KHR :: 3294668296;
+    INSUFFICIENT_BITSTREAM_BUFFER_RANGE_KHR :: 0xc460_a608;
     MAX_ENUM_KHR                            :: 2147483647;
 
     VK_QUERY_RESULT_STATUS_ERROR_KHR                               :: ERROR_KHR;
@@ -12870,7 +12870,8 @@ StdVideoH264SpsVuiFlags :: struct {
         nal_hrd_parameters_present_flag: u32; /* 1 bits */
         vcl_hrd_parameters_present_flag: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoH264SpsVuiFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoH264SpsVuiFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoH264HrdParameters :: struct {
@@ -12926,7 +12927,8 @@ StdVideoH264SpsFlags :: struct {
         seq_scaling_matrix_present_flag: u32; /* 1 bits */
         vui_parameters_present_flag: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoH264SpsFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoH264SpsFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoH264ScalingLists :: struct {
@@ -12976,7 +12978,8 @@ StdVideoH264PpsFlags :: struct {
         entropy_coding_mode_flag: u32; /* 1 bits */
         pic_scaling_matrix_present_flag: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoH264PpsFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoH264PpsFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoH264PictureParameterSet :: struct {
@@ -13547,7 +13550,8 @@ StdVideoH265VpsFlags :: struct {
         vps_timing_info_present_flag: u32; /* 1 bits */
         vps_poc_proportional_to_timing_flag: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoH265VpsFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoH265VpsFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoH265ProfileTierLevelFlags :: struct {
@@ -13559,7 +13563,8 @@ StdVideoH265ProfileTierLevelFlags :: struct {
         general_non_packed_constraint_flag: u32; /* 1 bits */
         general_frame_only_constraint_flag: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoH265ProfileTierLevelFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoH265ProfileTierLevelFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoH265ProfileTierLevel :: struct {
@@ -13691,7 +13696,8 @@ StdVideoH265ShortTermRefPicSetFlags :: struct {
         inter_ref_pic_set_prediction_flag: u32; /* 1 bits */
         delta_rps_sign: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoH265ShortTermRefPicSetFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoH265ShortTermRefPicSetFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoH265ShortTermRefPicSet :: struct {
@@ -14266,7 +14272,8 @@ StdVideoDecodeH264PictureInfoFlags :: struct {
         is_reference: u32; /* 1 bits */
         complementary_field_pair: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoDecodeH264PictureInfoFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoDecodeH264PictureInfoFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoDecodeH264PictureInfo :: struct {
@@ -14288,7 +14295,8 @@ StdVideoDecodeH264ReferenceInfoFlags :: struct {
         used_for_long_term_reference: u32; /* 1 bits */
         is_non_existing: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoDecodeH264ReferenceInfoFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoDecodeH264ReferenceInfoFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoDecodeH264ReferenceInfo :: struct {
@@ -14972,7 +14980,8 @@ StdVideoDecodeH265PictureInfoFlags :: struct {
         IsReference: u32; /* 1 bits */
         short_term_ref_pic_set_sps_flag: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoDecodeH265PictureInfoFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoDecodeH265PictureInfoFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoDecodeH265PictureInfo :: struct {
@@ -14995,7 +15004,8 @@ StdVideoDecodeH265ReferenceInfoFlags :: struct {
         used_for_long_term_reference: u32; /* 1 bits */
         unused_for_reference: u32; /* 1 bits */;
     */
-    #place __bitfield; StdVideoDecodeH265ReferenceInfoFlags_alignment: u32;
+
+    _:          [0] u32; // Force StdVideoDecodeH265ReferenceInfoFlags alignment to match the C/C++ equivalent
 }
 
 StdVideoDecodeH265ReferenceInfo :: struct {
@@ -21130,11 +21140,11 @@ VkOpacityMicromapFormatEXT :: enum u32 {
 }
 
 VkOpacityMicromapSpecialIndexEXT :: enum u32 {
-    FULLY_TRANSPARENT_EXT                        :: 4294967295;
-    FULLY_OPAQUE_EXT                             :: 4294967294;
-    FULLY_UNKNOWN_TRANSPARENT_EXT                :: 4294967293;
-    FULLY_UNKNOWN_OPAQUE_EXT                     :: 4294967292;
-    CLUSTER_GEOMETRY_DISABLE_OPACITY_MICROMAP_NV :: 4294967291;
+    FULLY_TRANSPARENT_EXT                        :: 0xffff_ffff;
+    FULLY_OPAQUE_EXT                             :: 0xffff_fffe;
+    FULLY_UNKNOWN_TRANSPARENT_EXT                :: 0xffff_fffd;
+    FULLY_UNKNOWN_OPAQUE_EXT                     :: 0xffff_fffc;
+    CLUSTER_GEOMETRY_DISABLE_OPACITY_MICROMAP_NV :: 0xffff_fffb;
     MAX_ENUM_EXT                                 :: 2147483647;
 
     VK_OPACITY_MICROMAP_SPECIAL_INDEX_FULLY_TRANSPARENT_EXT                        :: FULLY_TRANSPARENT_EXT;
