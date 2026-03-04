@@ -9,6 +9,10 @@
 // config
 AT_COMPILE_TIME   :: true;
 vulkan_h_location :: "source/vulkan.h";
+VULKAN_DOCS_BASE_URL :: "https://docs.vulkan.org/refpages/latest/refpages/source";
+DOCS_CACHE_DIR :: ".docs_cache";
+DOC_CACHE_NOT_FOUND :: "__NOT_FOUND__";
+DOC_HTTP_STATUS_MARKER :: "__HTTP_STATUS__:";
 
 
 // These are all the defines used in vulkan.h
@@ -346,7 +350,325 @@ device_funcs: [..]string;
 instance_funcs: [..]string;
 loader_funcs: [..]string;
 
+Function_Doc :: struct {
+    brief: string;
+    params: [..]string;
+    found: bool;
+}
 
+cache_file_path_for :: (func_name: string) -> string {
+    return tprint("%/%.txt", DOCS_CACHE_DIR, func_name);
+}
+
+normalize_whitespace :: (s: string) -> string {
+    builder: String_Builder;
+    init_string_builder(*builder);
+
+    last_was_space := false;
+    for s {
+        ch := it;
+        is_space := ch == #char " " || ch == #char "\n" || ch == #char "\r" || ch == #char "\t";
+        if is_space {
+            if !last_was_space {
+                append(*builder, #char " ");
+            }
+            last_was_space = true;
+        } else {
+            append(*builder, ch);
+            last_was_space = false;
+        }
+    }
+
+    return trim(builder_to_string(*builder));
+}
+
+decode_html_entities :: (s: string) -> string {
+    result := s;
+
+    {
+        temp := replace(result, "&amp;", "&");
+        result = temp;
+    }
+    {
+        temp := replace(result, "&lt;", "<");
+        result = temp;
+    }
+    {
+        temp := replace(result, "&gt;", ">");
+        result = temp;
+    }
+    {
+        temp := replace(result, "&quot;", "\"");
+        result = temp;
+    }
+    {
+        temp := replace(result, "&#39;", "'");
+        result = temp;
+    }
+    {
+        temp := replace(result, "&nbsp;", " ");
+        result = temp;
+    }
+
+    return result;
+}
+
+strip_html_tags :: (s: string) -> string {
+    builder: String_Builder;
+    init_string_builder(*builder);
+
+    in_tag := false;
+    for s {
+        ch := it;
+        if ch == #char "<" {
+            in_tag = true;
+            continue;
+        }
+        if ch == #char ">" {
+            in_tag = false;
+            continue;
+        }
+        if !in_tag {
+            append(*builder, ch);
+        }
+    }
+
+    return decode_html_entities(builder_to_string(*builder));
+}
+
+parse_doc_from_html :: (func_name: string, html: string) -> Function_Doc {
+    result: Function_Doc;
+
+    name_marker := "<h2 id=\"_name\"";
+    params_marker := "<h2 id=\"_parameters\"";
+
+    name_header_idx := find_index_from_left(html, name_marker);
+    if name_header_idx != -1 {
+        p_start := find_index_from_left(html, "<p>", name_header_idx);
+        if p_start != -1 {
+            p_end := find_index_from_left(html, "</p>", p_start);
+            if p_end != -1 && p_end > p_start+3 {
+                raw_name_line := slice(html, p_start+3, p_end-(p_start+3));
+                name_line := normalize_whitespace(strip_html_tags(raw_name_line));
+
+                prefix := tprint("% - ", func_name);
+                if begins_with(name_line, prefix) {
+                    result.brief = trim(slice(name_line, prefix.count, name_line.count-prefix.count));
+                } else {
+                    found_dash, _, right := split_from_left(name_line, " - ");
+                    if found_dash {
+                        result.brief = trim(right);
+                    }
+                }
+            }
+        }
+    }
+
+    params_header_idx := find_index_from_left(html, params_marker);
+    if params_header_idx != -1 {
+        params_end_idx := find_index_from_left(html, "<h2 id=\"_", params_header_idx+1);
+        if params_end_idx == -1 {
+            params_end_idx = html.count;
+        }
+
+        params_section := slice(html, params_header_idx, params_end_idx-params_header_idx);
+        search_idx := 0;
+
+        while true {
+            entry_start := find_index_from_left(params_section, "<p><code>", search_idx);
+            if entry_start == -1 break;
+
+            name_start := entry_start + 9;
+            name_end := find_index_from_left(params_section, "</code>", name_start);
+            if name_end == -1 break;
+
+            param_name := slice(params_section, name_start, name_end-name_start);
+
+            p_end := find_index_from_left(params_section, "</p>", name_end);
+            if p_end == -1 break;
+
+            desc_start := name_end + 7;
+            raw_desc := slice(params_section, desc_start, p_end-desc_start);
+            desc := normalize_whitespace(strip_html_tags(raw_desc));
+
+            if begins_with(desc, "is ") {
+                desc = slice(desc, 3, desc.count-3);
+            } else if begins_with(desc, "are ") {
+                desc = slice(desc, 4, desc.count-4);
+            }
+            desc = trim(desc);
+
+            if param_name && desc {
+                array_add(*result.params, tprint("%: %", param_name, desc));
+            }
+
+            search_idx = p_end + 4;
+        }
+    }
+
+    result.found = result.brief || result.params.count > 0;
+    return result;
+}
+
+read_doc_cache :: (func_name: string) -> Function_Doc {
+    result: Function_Doc;
+
+    path := cache_file_path_for(func_name);
+    cache_text, ok := read_entire_file(path, log_errors = false);
+    if !ok {
+        return result;
+    }
+    if !cache_text {
+        result.brief = DOC_CACHE_NOT_FOUND;
+        return result;
+    }
+
+    lines := split(cache_text, #char "\n");
+    if lines.count == 0 {
+        result.brief = DOC_CACHE_NOT_FOUND;
+        return result;
+    }
+
+    first_line := trim(lines[0]);
+    if first_line == DOC_CACHE_NOT_FOUND {
+        result.brief = DOC_CACHE_NOT_FOUND;
+        return result;
+    }
+
+    result.brief = first_line;
+    for i: 1..lines.count-1 {
+        line := trim(lines[i]);
+        if line {
+            array_add(*result.params, line);
+        }
+    }
+
+    result.found = result.brief || result.params.count > 0;
+    return result;
+}
+
+write_doc_cache_not_found :: (func_name: string) {
+    make_directory_if_it_does_not_exist(DOCS_CACHE_DIR, recursive = true);
+    success := write_entire_file(cache_file_path_for(func_name), tprint("%\n", DOC_CACHE_NOT_FOUND));
+    if !success {
+        log_error("Failed to write Vulkan docs cache miss for %", func_name);
+    }
+}
+
+write_doc_cache :: (func_name: string, doc: Function_Doc) {
+    if !doc.found return;
+
+    make_directory_if_it_does_not_exist(DOCS_CACHE_DIR, recursive = true);
+
+    builder: String_Builder;
+    init_string_builder(*builder);
+
+    append(*builder, doc.brief);
+    append(*builder, "\n");
+    for doc.params {
+        append(*builder, it);
+        append(*builder, "\n");
+    }
+
+    success := write_entire_file(cache_file_path_for(func_name), *builder);
+    if !success {
+        log_error("Failed to write Vulkan docs cache for %", func_name);
+    }
+}
+
+fetch_doc_html :: (func_name: string) -> string, bool, int {
+    url := tprint("%/%.html", VULKAN_DOCS_BASE_URL, func_name);
+
+    process_result, output_string, _, timeout_reached := run_command(
+        "curl",
+        "-s",
+        "-L",
+        "--max-time", "10",
+        "-w",
+        "\n__HTTP_STATUS__:%{http_code}\n",
+        url,
+        capture_and_return_output = true,
+        timeout_ms = 15000
+    );
+
+    if timeout_reached {
+        log_error("Curl timed out while fetching docs for %", func_name);
+        return "", false, 0;
+    }
+    if process_result.type != .EXITED || process_result.exit_code != 0 {
+        return "", false, 0;
+    }
+
+    found, body, status_text := split_from_right(output_string, DOC_HTTP_STATUS_MARKER);
+    if !found {
+        return "", false, 0;
+    }
+
+    status_line := trim(status_text);
+    status_code, ok := parse_int(*status_line, int);
+    if !ok {
+        return "", false, 0;
+    }
+
+    return body, true, status_code;
+}
+
+get_vulkan_function_doc :: (func_name: string) -> Function_Doc {
+    cached := read_doc_cache(func_name);
+    if cached.brief == DOC_CACHE_NOT_FOUND {
+        return .{};
+    }
+    if cached.found {
+        return cached;
+    }
+
+    // Fetch from web if not cached
+    html, ok, status_code := fetch_doc_html(func_name);
+    if !ok {
+        log("Fetching docs for % timed out or failed", func_name);
+        return .{};
+    }
+    if status_code == 404 {
+        log("Docs not found (404) for %", func_name);
+        write_doc_cache_not_found(func_name);
+        return .{};
+    }
+    if status_code != 200 {
+        log("Docs fetch returned status % for %", status_code, func_name);
+        return .{};
+    }
+
+    log("Loaded docs from site: %", func_name);
+    doc := parse_doc_from_html(func_name, html);
+    if doc.found {
+        write_doc_cache(func_name, doc);
+    }
+
+    return doc;
+}
+
+write_function_doc_comment :: (builder: *String_Builder, func_name: string, indent := "") {
+    doc := get_vulkan_function_doc(func_name);
+    if !doc.found return;
+
+    append(builder, "\n");
+
+    append(builder, indent);
+    append(builder, "// ");
+    append(builder, func_name);
+if doc.brief {
+        append(builder, " - ");
+        append(builder, doc.brief);
+    }
+    append(builder, "\n");
+
+    for doc.params {
+        append(builder, indent);
+        append(builder, "//   ");
+        append(builder, it);
+        append(builder, "\n");
+    }
+}
 
 generate_funcs :: () {
     builder: String_Builder;
@@ -383,12 +705,15 @@ generate_funcs :: () {
     }
 
     for loader_funcs {
+        write_function_doc_comment(*builder, it);
         write_func_variable_declaration(*builder, it);
     }
     for instance_funcs {
+        write_function_doc_comment(*builder, it);
         write_func_variable_declaration(*builder, it);
     }
     for device_funcs {
+        write_function_doc_comment(*builder, it);
         write_func_variable_declaration(*builder, it);
     }
 
@@ -439,3 +764,4 @@ generate_funcs :: () {
 #import "File";
 #import "String";
 #import "Hash_Table";
+#import "Process";
